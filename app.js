@@ -1,7 +1,7 @@
 // =========================
 // Backend configuration
 // =========================
-const BACKEND_BASE_URL = 'https://phonebox-bac-git-546130-matthewvincentthomasmalone-ops-projects.vercel.app';
+const BACKEND_BASE_URL = 'https://phonebox-backend.vercel.app';
 const ANSWER_API_URL = `${BACKEND_BASE_URL}/api/answer`;
 const HANGUP_API_URL = `${BACKEND_BASE_URL}/api/hangup`;
 
@@ -265,3 +265,4 @@ function formatDuration(s) {
 function formatTime(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
+
