@@ -180,30 +180,26 @@ async function onHangupClick(endpoint) {
   }
 }
 
-function connectWebSocket() {
+async function pollForCalls() {
   try {
-    socket = new WebSocket(WS_URL);
-  } catch (error) {
-    addLog('error', 'system', null, `WebSocket setup failed: ${error.message}`);
-    return;
-  }
+    const response = await fetch(`${BACKEND_BASE_URL}/api/status`);
+    const activeCalls = await response.json();
 
-  socket.addEventListener('open', () => {
-    addLog('info', 'system', null, 'WebSocket connected');
-  });
-
-  socket.addEventListener('message', (event) => {
-    let payload;
-    try {
-      payload = JSON.parse(event.data);
-    } catch {
-      addLog('error', 'system', null, `Invalid JSON event: ${event.data}`);
-      return;
+    // Loop through your local state and update if a call is found in the backend
+    for (const [number, callData] of Object.entries(activeCalls)) {
+      applyBackendEvent({
+        eventType: 'ringing',
+        endpointNumber: number,
+        callSid: callData.callSid
+      });
     }
+  } catch (error) {
+    console.error("Polling failed", error);
+  }
+}
 
-    applyBackendEvent(payload);
-    renderTiles();
-  });
+// Check for new calls every 3 seconds
+setInterval(pollForCalls, 3000);
 
   socket.addEventListener('close', () => {
     addLog('error', 'system', null, 'WebSocket closed, retrying in 3s...');
@@ -314,3 +310,4 @@ function formatTime(ms) {
     return '-';
   }
 }
+
