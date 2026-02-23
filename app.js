@@ -1,9 +1,7 @@
 // =========================
-// Backend placeholders
+// Backend configuration
 // =========================
-// Replace BACKEND_BASE_URL if your API is hosted elsewhere.
 const BACKEND_BASE_URL = 'https://phonebox-bac-git-546130-matthewvincentthomasmalone-ops-projects.vercel.app';
-const WS_URL = `${BACKEND_BASE_URL.replace('https://', 'wss://')}/ws`;
 const ANSWER_API_URL = `${BACKEND_BASE_URL}/api/answer`;
 const HANGUP_API_URL = `${BACKEND_BASE_URL}/api/hangup`;
 
@@ -18,7 +16,6 @@ const ENDPOINTS = [
 const IDLE_STATE = 'idle';
 const MAX_LOG_ITEMS = 20;
 const stateByNumber = new Map();
-let socket;
 let ringMuted = false;
 
 const endpointGrid = document.getElementById('endpointGrid');
@@ -27,13 +24,14 @@ const muteToggle = document.getElementById('muteToggle');
 const resetBtn = document.getElementById('resetBtn');
 const ringAudio = document.getElementById('ringAudio');
 
+// --- Start the Engine ---
 initializeState();
 renderTiles();
-connectWebSocket();
 
-muteToggle.addEventListener('click', toggleMute);
-resetBtn.addEventListener('click', resetAll);
+// Polling: Asks Vercel "Who is calling?" every 3 seconds
+setInterval(pollForCalls, 3000);
 
+// UI Loop: Handles flashing, timer counting, and audio every 0.5s
 setInterval(() => {
   const shouldPlayRing = ENDPOINTS.some((endpoint) => stateByNumber.get(endpoint.number)?.status === 'ringing');
 
@@ -45,6 +43,11 @@ setInterval(() => {
 
   renderTiles();
 }, 500);
+
+muteToggle.addEventListener('click', toggleMute);
+resetBtn.addEventListener('click', resetAll);
+
+// --- Logic Functions ---
 
 function initializeState() {
   ENDPOINTS.forEach((endpoint) => {
@@ -61,6 +64,117 @@ function initializeState() {
   });
 }
 
+async function pollForCalls() {
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/status`);
+    const data = await response.json();
+
+    if (data.ok && data.calls) {
+      // Check for calls that have ended (they disappear from the backend Map)
+      stateByNumber.forEach((entry, number) => {
+        if (entry.status === 'ringing' && !data.calls[number]) {
+          applyBackendEvent({ eventType: 'completed', endpointNumber: number });
+        }
+      });
+
+      // Update UI for active calls found in the backend
+      Object.entries(data.calls).forEach(([number, callData]) => {
+        applyBackendEvent({
+          eventType: 'ringing',
+          endpointNumber: number,
+          callSid: callData.callSid
+        });
+      });
+    }
+  } catch (error) {
+    console.error("Polling error:", error);
+  }
+}
+
+function applyBackendEvent(evt) {
+  const { eventType, endpointNumber, callSid, timestamp } = evt;
+  const entry = stateByNumber.get(endpointNumber);
+
+  if (!entry) return;
+
+  const eventTime = timestamp ? new Date(timestamp).getTime() : Date.now();
+
+  // Prevent spamming the log if we are already in the correct state
+  if (eventType === 'ringing' && entry.status === 'ringing') return;
+
+  if (eventType === 'ringing') {
+    entry.status = 'ringing';
+    entry.callSid = callSid || entry.callSid;
+    entry.ringingSince = entry.ringingSince || eventTime;
+    entry.lastRingTime = eventTime;
+    entry.errorMessage = '';
+    entry.callsToday += 1;
+    addLog('ringing', endpointNumber, callSid, 'Incoming call detected');
+  } else if (eventType === 'completed') {
+    entry.status = 'completed';
+    entry.ringingSince = null;
+    entry.callSid = null;
+    addLog('completed', endpointNumber, null, 'Call cleared');
+  }
+}
+
+async function onAnswerClick(endpoint) {
+  const entry = stateByNumber.get(endpoint.number);
+  if (entry.status !== 'ringing') return;
+
+  entry.status = 'answering';
+  renderTiles();
+
+  try {
+    const response = await fetch(ANSWER_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpointNumber: endpoint.number, callSid: entry.callSid })
+    });
+
+    if (!response.ok) throw new Error(`Answer failed: ${response.status}`);
+
+    entry.status = 'answered';
+    entry.answeredAt = Date.now();
+    entry.ringingSince = null;
+    addLog('answered', endpoint.number, entry.callSid, 'Call connected successfully');
+  } catch (error) {
+    entry.status = 'error';
+    entry.errorMessage = error.message;
+    addLog('error', endpoint.number, entry.callSid, error.message);
+  }
+}
+
+async function onHangupClick(endpoint) {
+  const entry = stateByNumber.get(endpoint.number);
+  if (entry.status !== 'answered' && entry.status !== 'answering') return;
+
+  entry.status = 'hanging_up';
+  renderTiles();
+
+  try {
+    const response = await fetch(HANGUP_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpointNumber: endpoint.number, callSid: entry.callSid })
+    });
+
+    if (!response.ok) throw new Error('Terminate failed');
+
+    entry.status = 'completed';
+    if (entry.answeredAt) {
+      entry.callDurationSec = Math.floor((Date.now() - entry.answeredAt) / 1000);
+    }
+    entry.callSid = null;
+    addLog('completed', endpoint.number, null, 'Call terminated by console');
+  } catch (error) {
+    entry.status = 'error';
+    entry.errorMessage = error.message;
+  }
+}
+
+// --- UI Helpers ---
+
 function renderTiles() {
   endpointGrid.innerHTML = '';
 
@@ -74,9 +188,7 @@ function renderTiles() {
     const ringSeconds = entry.ringingSince ? Math.floor((Date.now() - entry.ringingSince) / 1000) : 0;
 
     tile.innerHTML = `
-      <div class="tile-head">
-        <div class="business">${endpoint.businessName}</div>
-      </div>
+      <div class="tile-head"><div class="business">${endpoint.businessName}</div></div>
       <div class="number">${endpoint.displayNumber}</div>
       <div class="status-row status-${entry.status}">
         <span class="status-chip"><span class="signal-icon"></span>${statusText}</span>
@@ -89,9 +201,8 @@ function renderTiles() {
       <div class="action-hint">${actionHint(entry.status, endpoint.messageLabel)}</div>
       <div class="meta">
         <span>Last ring: ${entry.lastRingTime ? formatTime(entry.lastRingTime) : '-'}</span>
-        <span>Call duration: ${formatDuration(entry.callDurationSec)}</span>
+        <span>Duration: ${formatDuration(entry.callDurationSec)}</span>
         <span>Calls today: ${entry.callsToday}</span>
-        <span>${entry.errorMessage || ''}</span>
       </div>
     `;
 
@@ -108,176 +219,29 @@ function actionHint(status, messageLabel) {
   if (status === 'answered') return `Connected: ${messageLabel}`;
   if (status === 'hanging_up') return 'Termination in progress...';
   if (status === 'completed') return 'Call completed';
-  if (status === 'error') return 'Error while handling call';
   return 'Standing by for incoming call';
-}
-
-async function onAnswerClick(endpoint) {
-  const entry = stateByNumber.get(endpoint.number);
-
-  if (entry.status !== 'ringing') return;
-
-  entry.status = 'answering';
-  entry.errorMessage = '';
-  renderTiles();
-
-  try {
-    const response = await fetch(ANSWER_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ endpointNumber: endpoint.number, callSid: entry.callSid })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Answer failed with status ${response.status}`);
-    }
-
-    entry.status = 'answered';
-    entry.answeredAt = Date.now();
-    entry.ringingSince = null;
-    addLog('answered', endpoint.number, entry.callSid, 'Answer API success');
-  } catch (error) {
-    entry.status = 'error';
-    entry.errorMessage = error.message;
-    addLog('error', endpoint.number, entry.callSid, `Answer API error: ${error.message}`);
-  } finally {
-    renderTiles();
-  }
-}
-
-async function onHangupClick(endpoint) {
-  const entry = stateByNumber.get(endpoint.number);
-
-  if (entry.status !== 'answered' && entry.status !== 'answering') return;
-
-  entry.status = 'hanging_up';
-  entry.errorMessage = '';
-  renderTiles();
-
-  try {
-    const response = await fetch(HANGUP_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ endpointNumber: endpoint.number, callSid: entry.callSid })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Terminate failed with status ${response.status}`);
-    }
-
-    entry.status = 'completed';
-    if (entry.answeredAt) {
-      entry.callDurationSec = Math.max(0, Math.floor((Date.now() - entry.answeredAt) / 1000));
-    }
-    entry.ringingSince = null;
-    addLog('completed', endpoint.number, entry.callSid, 'Terminate API success');
-  } catch (error) {
-    entry.status = 'error';
-    entry.errorMessage = error.message;
-    addLog('error', endpoint.number, entry.callSid, `Terminate API error: ${error.message}`);
-  } finally {
-    renderTiles();
-  }
-}
-
-async function pollForCalls() {
-  try {
-    const response = await fetch(`${BACKEND_BASE_URL}/api/status`);
-    const activeCalls = await response.json();
-
-    // Loop through your local state and update if a call is found in the backend
-    for (const [number, callData] of Object.entries(activeCalls)) {
-      applyBackendEvent({
-        eventType: 'ringing',
-        endpointNumber: number,
-        callSid: callData.callSid
-      });
-    }
-  } catch (error) {
-    console.error("Polling failed", error);
-  }
-}
-
-// Check for new calls every 3 seconds
-setInterval(pollForCalls, 3000);
-
-  socket.addEventListener('close', () => {
-    addLog('error', 'system', null, 'WebSocket closed, retrying in 3s...');
-    setTimeout(connectWebSocket, 3000);
-  });
-
-  socket.addEventListener('error', () => {
-    addLog('error', 'system', null, 'WebSocket error');
-  });
-}
-
-function applyBackendEvent(evt) {
-  const { eventType, endpointNumber, callSid, timestamp } = evt;
-  const entry = stateByNumber.get(endpointNumber);
-
-  if (!entry) {
-    addLog('error', endpointNumber || 'unknown', callSid, `Unknown endpoint in event: ${JSON.stringify(evt)}`);
-    return;
-  }
-
-  const eventTime = timestamp ? new Date(timestamp).getTime() : Date.now();
-
-  if (eventType === 'ringing') {
-    entry.status = 'ringing';
-    entry.callSid = callSid || entry.callSid;
-    entry.ringingSince = eventTime;
-    entry.lastRingTime = eventTime;
-    entry.errorMessage = '';
-    entry.callsToday += 1;
-  } else if (eventType === 'answered') {
-    entry.status = 'answered';
-    entry.answeredAt = eventTime;
-    entry.ringingSince = null;
-  } else if (eventType === 'completed') {
-    entry.status = 'completed';
-    if (entry.answeredAt) {
-      entry.callDurationSec = Math.max(0, Math.floor((eventTime - entry.answeredAt) / 1000));
-    }
-    entry.ringingSince = null;
-    entry.callSid = null;
-  } else if (eventType === 'error') {
-    entry.status = 'error';
-    entry.errorMessage = 'Backend signaled error';
-    entry.ringingSince = null;
-  }
-
-  addLog(eventType || 'unknown', endpointNumber, callSid, 'Event received from backend');
 }
 
 function addLog(type, endpointNumber, callSid, message) {
   const li = document.createElement('li');
   const time = new Date().toLocaleTimeString();
-  li.textContent = `[${time}] [${type.toUpperCase()}] ${endpointNumber}${callSid ? ` (${callSid})` : ''} — ${message}`;
-
+  li.textContent = `[${time}] [${type.toUpperCase()}] ${endpointNumber} — ${message}`;
   eventLog.prepend(li);
-  while (eventLog.children.length > MAX_LOG_ITEMS) {
-    eventLog.removeChild(eventLog.lastChild);
-  }
+  if (eventLog.children.length > MAX_LOG_ITEMS) eventLog.removeChild(eventLog.lastChild);
 }
 
 function readableStatus(status) {
-  if (!status) return 'Idle';
-  if (status === 'hanging_up') return 'Terminating';
-  return status.charAt(0).toUpperCase() + status.slice(1);
+  return status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
 }
 
 function toggleMute() {
   ringMuted = !ringMuted;
-  muteToggle.setAttribute('aria-pressed', ringMuted ? 'true' : 'false');
+  muteToggle.setAttribute('aria-pressed', ringMuted);
   muteToggle.textContent = ringMuted ? 'Ring Sound: Off' : 'Ring Sound: On';
-  if (ringMuted) stopRing();
 }
 
 function tryPlayRing() {
-  if (!ringAudio.paused) return;
-  ringAudio.play().catch(() => {
-    // Browser autoplay restrictions may block audio until user interaction.
-  });
+  if (ringAudio.paused) ringAudio.play().catch(() => {});
 }
 
 function stopRing() {
@@ -292,22 +256,12 @@ function resetAll() {
   renderTiles();
 }
 
-function formatDuration(totalSec) {
-  const s = totalSec || 0;
-  const mins = Math.floor(s / 60)
-    .toString()
-    .padStart(2, '0');
-  const sec = Math.floor(s % 60)
-    .toString()
-    .padStart(2, '0');
+function formatDuration(s) {
+  const mins = Math.floor(s / 60).toString().padStart(2, '0');
+  const sec = (s % 60).toString().padStart(2, '0');
   return `${mins}:${sec}`;
 }
 
 function formatTime(ms) {
-  try {
-    return new Date(ms).toLocaleTimeString();
-  } catch {
-    return '-';
-  }
+  return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
-
