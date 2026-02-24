@@ -196,6 +196,7 @@ function renderTiles() {
       </div>
       <div class="actions-row">
         <button class="action-btn answer-btn" ${entry.status === 'ringing' ? '' : 'disabled'}>Answer</button>
+        <button class="action-btn pass-btn" ${entry.status === 'ringing' ? '' : 'disabled'}>Pass</button> <button class="action-btn hangup-btn" ${(entry.status === 'answered' || entry.status === 'answering' || entry.status === 'ringing') ? '' : 'disabled'}>Terminate</button>
         <button class="action-btn hangup-btn" ${(entry.status === 'answered' || entry.status === 'answering') ? '' : 'disabled'}>Terminate</button>
       </div>
       <div class="action-hint">${actionHint(entry.status, endpoint.messageLabel)}</div>
@@ -207,6 +208,7 @@ function renderTiles() {
     `;
 
     tile.querySelector('.answer-btn')?.addEventListener('click', () => onAnswerClick(endpoint));
+    tile.querySelector('.pass-btn')?.addEventListener('click', () => onPassClick(endpoint));
     tile.querySelector('.hangup-btn')?.addEventListener('click', () => onHangupClick(endpoint));
 
     endpointGrid.appendChild(tile);
@@ -219,6 +221,7 @@ function actionHint(status, messageLabel) {
   if (status === 'answered') return `Connected: ${messageLabel}`;
   if (status === 'hanging_up') return 'Termination in progress...';
   if (status === 'completed') return 'Call completed';
+  if (status === 'passing') return 'Requesting next agent in hunt group...';
   return 'Standing by for incoming call';
 }
 
@@ -265,4 +268,5 @@ function formatDuration(s) {
 function formatTime(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
+
 
