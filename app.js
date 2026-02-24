@@ -263,7 +263,7 @@ function actionHint(status, messageLabel) {
 function addLog(type, endpointNumber, callSid, message) {
   const li = document.createElement('li');
   const time = new Date().toLocaleTimeString();
-  li.textContent = \`[\${time}] [\${type.toUpperCase()}] \${endpointNumber} — \${message}\`;
+  li.textContent = `[${time}] [${type.toUpperCase()}] ${endpointNumber} — ${message}`; // Cleaned backslashes
   eventLog.prepend(li);
   if (eventLog.children.length > MAX_LOG_ITEMS) eventLog.removeChild(eventLog.lastChild);
 }
@@ -303,4 +303,5 @@ function formatDuration(s) {
 function formatTime(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
+
 
