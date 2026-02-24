@@ -196,8 +196,8 @@ function renderTiles() {
       </div>
       <div class="actions-row">
         <button class="action-btn answer-btn" ${entry.status === 'ringing' ? '' : 'disabled'}>Answer</button>
-        <button class="action-btn pass-btn" ${entry.status === 'ringing' ? '' : 'disabled'}>Pass</button> <button class="action-btn hangup-btn" ${(entry.status === 'answered' || entry.status === 'answering' || entry.status === 'ringing') ? '' : 'disabled'}>Terminate</button>
-        <button class="action-btn hangup-btn" ${(entry.status === 'answered' || entry.status === 'answering') ? '' : 'disabled'}>Terminate</button>
+        <button class="action-btn pass-btn" ${entry.status === 'ringing' ? '' : 'disabled'}>Pass</button>
+        <button class="action-btn hangup-btn" ${(entry.status === 'answered' || entry.status === 'answering' || entry.status === 'ringing') ? '' : 'disabled'}>Terminate</button>
       </div>
       <div class="action-hint">${actionHint(entry.status, endpoint.messageLabel)}</div>
       <div class="meta">
@@ -206,7 +206,7 @@ function renderTiles() {
         <span>Calls today: ${entry.callsToday}</span>
       </div>
     `;
-
+    
     tile.querySelector('.answer-btn')?.addEventListener('click', () => onAnswerClick(endpoint));
     tile.querySelector('.pass-btn')?.addEventListener('click', () => onPassClick(endpoint));
     tile.querySelector('.hangup-btn')?.addEventListener('click', () => onHangupClick(endpoint));
@@ -268,5 +268,6 @@ function formatDuration(s) {
 function formatTime(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
+
 
 
