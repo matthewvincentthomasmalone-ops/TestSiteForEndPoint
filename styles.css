@@ -80,27 +80,39 @@ main { margin-top: 1rem; display: grid; grid-template-columns: minmax(0, 2.2fr) 
 .status-ringing .signal-icon { background: var(--ringing); animation: beaconFlash 0.8s ease-in-out infinite; }
 @keyframes beaconFlash { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.25); opacity: 0.45; } }
 
-.actions-row { display: flex; gap: 0.6rem; }
+/* [Previous root and base styles...] */
+
+.actions-row {
+  display: flex;
+  gap: 0.6rem;
+}
+
 .action-btn {
-  flex: 1; border: 0; border-radius: 10px; padding: 0.58rem 0.75rem; font-weight: 800;
-  text-transform: uppercase; cursor: pointer; color: var(--baby-blue);
+  flex: 1;
+  border: 0;
+  border-radius: 10px;
+  padding: 0.58rem 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--baby-blue);
+  cursor: pointer;
+}
+
+.pass-btn {
+  background: linear-gradient(180deg, #4a4a4a, #2d2d2d) !important;
+  border: 1px solid #1a1a1a !important;
+  opacity: 1 !important; /* Forces visibility over old transparent styles */
 }
 
 .answer-btn { background: linear-gradient(180deg, #52e6c8, #1fb99d); }
 .hangup-btn { background: linear-gradient(180deg, #9b0f39, #750024); }
 
-/* Charcoal Pass Button Styling */
-.pass-btn {
-  background: linear-gradient(180deg, #4a4a4a, #2d2d2d) !important;
-  border: 1px solid #1a1a1a !important;
-  opacity: 1 !important;
-  position: relative;
-  z-index: 1;
+.action-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
-
-.action-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-
 .event-panel { background: linear-gradient(180deg, #fff8fc, #ffe8f1); border: 1px solid var(--border); border-radius: 14px; padding: 0.9rem; }
 .event-log { list-style: none; margin: 0; padding: 0; max-height: 67vh; overflow: auto; display: flex; flex-direction: column; gap: 0.48rem; }
 .event-log li { background: var(--panel-soft); border: 1px solid #e3bbcd; border-radius: 8px; padding: 0.52rem; font-size: 0.82rem; }
 .footer-actions { margin-top: 1rem; display: flex; justify-content: center; }
+
