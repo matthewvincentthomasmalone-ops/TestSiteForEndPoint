@@ -15,7 +15,6 @@ async function initVoice() {
     if (!resp.ok) throw new Error("Could not fetch token");
     const { token } = await resp.json();
 
-    // Initialize Twilio Voice Device
     device = new Twilio.Voice.Device(token, {
       codecPreferences: ['opus', 'pcmu'],
       fakeLocalDTMF: true,
@@ -29,7 +28,7 @@ async function initVoice() {
   }
 }
 
-initVoice(); // Start the engine immediately
+initVoice(); 
 
 const ENDPOINTS = [
   { number: '+61851246362', displayNumber: '+61 8 5124 6362', businessName: "Wesley and Co’s Locks Ipswich", messageLabel: 'Wesley welcome message' },
