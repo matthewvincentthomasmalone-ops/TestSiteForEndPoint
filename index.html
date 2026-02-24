@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Virtual Endpoints Phonebox</title>
+    <script src="https://sdk.twilio.com/js/voice/releases/1.25.0/twilio.min.js"></script>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -36,6 +37,8 @@
         <button id="resetBtn" class="reset-btn">Reset</button>
       </div>
     </div>
+
+    <audio id="remoteAudio" autoplay></audio>
 
     <audio id="ringAudio" preload="auto" loop>
       <source src="https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg" type="audio/ogg" />
