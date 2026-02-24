@@ -223,24 +223,24 @@ function renderTiles() {
     const statusText = readableStatus(entry.status);
     const ringSeconds = entry.ringingSince ? Math.floor((Date.now() - entry.ringingSince) / 1000) : 0;
     
-    // Fixed syntax for the actions-row
+    // REMOVED ALL BACKSLASHES BELOW
     tile.innerHTML = `
       <div class="tile-head"><div class="business">${endpoint.businessName}</div></div>
       <div class="number">${endpoint.displayNumber}</div>
       <div class="status-row status-${entry.status}">
-        <span class="status-chip"><span class="signal-icon"></span>\${statusText}</span>
-        <span>\${entry.status === 'ringing' ? \`Ringing \${ringSeconds}s\` : ''}</span>
+        <span class="status-chip"><span class="signal-icon"></span>${statusText}</span>
+        <span>${entry.status === 'ringing' ? `Ringing ${ringSeconds}s` : ''}</span>
       </div>
       <div class="actions-row">
-        <button class="action-btn answer-btn" \${entry.status === 'ringing' ? '' : 'disabled'}>Answer</button>
-        <button class="action-btn pass-btn" \${entry.status === 'ringing' ? '' : 'disabled'}>Pass</button>
-        <button class="action-btn hangup-btn" \${(entry.status === 'answered' || entry.status === 'answering' || entry.status === 'ringing') ? '' : 'disabled'}>Terminate</button>
+        <button class="action-btn answer-btn" ${entry.status === 'ringing' ? '' : 'disabled'}>Answer</button>
+        <button class="action-btn pass-btn" ${entry.status === 'ringing' ? '' : 'disabled'}>Pass</button>
+        <button class="action-btn hangup-btn" ${(entry.status === 'answered' || entry.status === 'answering' || entry.status === 'ringing') ? '' : 'disabled'}>Terminate</button>
       </div>
-      <div class="action-hint">\${actionHint(entry.status, endpoint.messageLabel)}</div>
+      <div class="action-hint">${actionHint(entry.status, endpoint.messageLabel)}</div>
       <div class="meta">
-        <span>Last ring: \${entry.lastRingTime ? formatTime(entry.lastRingTime) : '-'}</span>
-        <span>Duration: \${formatDuration(entry.callDurationSec)}</span>
-        <span>Calls today: \${entry.callsToday}</span>
+        <span>Last ring: ${entry.lastRingTime ? formatTime(entry.lastRingTime) : '-'}</span>
+        <span>Duration: ${formatDuration(entry.callDurationSec)}</span>
+        <span>Calls today: ${entry.callsToday}</span>
       </div>
     `;
     tile.querySelector('.answer-btn')?.addEventListener('click', () => onAnswerClick(endpoint));
@@ -303,3 +303,4 @@ function formatDuration(s) {
 function formatTime(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
+
