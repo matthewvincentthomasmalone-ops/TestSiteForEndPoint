@@ -4,6 +4,7 @@
 const BACKEND_BASE_URL = 'https://phonebox-backend.vercel.app';
 const ANSWER_API_URL = `${BACKEND_BASE_URL}/api/answer`;
 const HANGUP_API_URL = `${BACKEND_BASE_URL}/api/hangup`;
+const PASS_API_URL = `${BACKEND_BASE_URL}/api/pass`;
 
 const ENDPOINTS = [
   { number: '+61851246362', displayNumber: '+61 8 5124 6362', businessName: "Wesley and Co’s Locks Ipswich", messageLabel: 'Wesley welcome message' },
@@ -24,30 +25,23 @@ const muteToggle = document.getElementById('muteToggle');
 const resetBtn = document.getElementById('resetBtn');
 const ringAudio = document.getElementById('ringAudio');
 
-// --- Start the Engine ---
 initializeState();
 renderTiles();
 
-// Polling: Asks Vercel "Who is calling?" every 3 seconds
 setInterval(pollForCalls, 3000);
 
-// UI Loop: Handles flashing, timer counting, and audio every 0.5s
 setInterval(() => {
   const shouldPlayRing = ENDPOINTS.some((endpoint) => stateByNumber.get(endpoint.number)?.status === 'ringing');
-
   if (!ringMuted && shouldPlayRing) {
     tryPlayRing();
   } else {
     stopRing();
   }
-
   renderTiles();
 }, 500);
 
 muteToggle.addEventListener('click', toggleMute);
 resetBtn.addEventListener('click', resetAll);
-
-// --- Logic Functions ---
 
 function initializeState() {
   ENDPOINTS.forEach((endpoint) => {
@@ -68,16 +62,12 @@ async function pollForCalls() {
   try {
     const response = await fetch(`${BACKEND_BASE_URL}/api/status`);
     const data = await response.json();
-
     if (data.ok && data.calls) {
-      // Check for calls that have ended (they disappear from the backend Map)
       stateByNumber.forEach((entry, number) => {
         if (entry.status === 'ringing' && !data.calls[number]) {
           applyBackendEvent({ eventType: 'completed', endpointNumber: number });
         }
       });
-
-      // Update UI for active calls found in the backend
       Object.entries(data.calls).forEach(([number, callData]) => {
         applyBackendEvent({
           eventType: 'ringing',
@@ -94,14 +84,9 @@ async function pollForCalls() {
 function applyBackendEvent(evt) {
   const { eventType, endpointNumber, callSid, timestamp } = evt;
   const entry = stateByNumber.get(endpointNumber);
-
   if (!entry) return;
-
   const eventTime = timestamp ? new Date(timestamp).getTime() : Date.now();
-
-  // Prevent spamming the log if we are already in the correct state
   if (eventType === 'ringing' && entry.status === 'ringing') return;
-
   if (eventType === 'ringing') {
     entry.status = 'ringing';
     entry.callSid = callSid || entry.callSid;
@@ -121,19 +106,15 @@ function applyBackendEvent(evt) {
 async function onAnswerClick(endpoint) {
   const entry = stateByNumber.get(endpoint.number);
   if (entry.status !== 'ringing') return;
-
   entry.status = 'answering';
   renderTiles();
-
   try {
     const response = await fetch(ANSWER_API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ endpointNumber: endpoint.number, callSid: entry.callSid })
     });
-
     if (!response.ok) throw new Error(`Answer failed: ${response.status}`);
-
     entry.status = 'answered';
     entry.answeredAt = Date.now();
     entry.ringingSince = null;
@@ -145,22 +126,40 @@ async function onAnswerClick(endpoint) {
   }
 }
 
+async function onPassClick(endpoint) {
+  const entry = stateByNumber.get(endpoint.number);
+  if (entry.status !== 'ringing') return;
+  entry.status = 'passing';
+  renderTiles();
+  try {
+    const response = await fetch(PASS_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpointNumber: endpoint.number, callSid: entry.callSid })
+    });
+    if (!response.ok) throw new Error('Pass failed');
+    entry.status = IDLE_STATE;
+    entry.callSid = null;
+    addLog('info', endpoint.number, null, 'Call passed to next in hunt group');
+  } catch (error) {
+    entry.status = 'error';
+    entry.errorMessage = error.message;
+    addLog('error', endpoint.number, null, error.message);
+  }
+}
+
 async function onHangupClick(endpoint) {
   const entry = stateByNumber.get(endpoint.number);
-  if (entry.status !== 'answered' && entry.status !== 'answering') return;
-
+  if (entry.status !== 'answered' && entry.status !== 'answering' && entry.status !== 'ringing') return;
   entry.status = 'hanging_up';
   renderTiles();
-
   try {
     const response = await fetch(HANGUP_API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ endpointNumber: endpoint.number, callSid: entry.callSid })
     });
-
     if (!response.ok) throw new Error('Terminate failed');
-
     entry.status = 'completed';
     if (entry.answeredAt) {
       entry.callDurationSec = Math.floor((Date.now() - entry.answeredAt) / 1000);
@@ -173,20 +172,15 @@ async function onHangupClick(endpoint) {
   }
 }
 
-// --- UI Helpers ---
-
 function renderTiles() {
   endpointGrid.innerHTML = '';
-
   ENDPOINTS.forEach((endpoint) => {
     const entry = stateByNumber.get(endpoint.number);
     const tile = document.createElement('article');
     tile.className = `tile ${entry.status}`;
     if (entry.status === 'ringing') tile.classList.add('ringing');
-
     const statusText = readableStatus(entry.status);
     const ringSeconds = entry.ringingSince ? Math.floor((Date.now() - entry.ringingSince) / 1000) : 0;
-
     tile.innerHTML = `
       <div class="tile-head"><div class="business">${endpoint.businessName}</div></div>
       <div class="number">${endpoint.displayNumber}</div>
@@ -206,11 +200,9 @@ function renderTiles() {
         <span>Calls today: ${entry.callsToday}</span>
       </div>
     `;
-    
     tile.querySelector('.answer-btn')?.addEventListener('click', () => onAnswerClick(endpoint));
     tile.querySelector('.pass-btn')?.addEventListener('click', () => onPassClick(endpoint));
     tile.querySelector('.hangup-btn')?.addEventListener('click', () => onHangupClick(endpoint));
-
     endpointGrid.appendChild(tile);
   });
 }
@@ -268,6 +260,3 @@ function formatDuration(s) {
 function formatTime(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
-
-
-
