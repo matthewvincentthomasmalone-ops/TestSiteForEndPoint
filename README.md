@@ -16,6 +16,14 @@ index 3603afa227c80300e10ed76fe692b0ee68bf285a..197656413df655849ff6abcf784b6b41
 +4. Select your branch and `/ (root)` folder, then save.
 +5. Wait for the Pages build to complete and open your published URL.
 +
++## Environment Variables
+To run this project, you will need to add the following variables to your Vercel project settings:
++
++ `MY_REDIS_URL`: Your Upstash REST URL
++ `MY_REDIS_TOKEN`: Your Upstash REST Token
++ `TWILIO_ACCOUNT_SID`: Your Twilio SID
++ `TWILIO_AUTH_TOKEN`: Your Twilio Auth Token
++
 +## Backend configuration
 +
 +The frontend is static and calls the backend defined in `app.js`:
@@ -48,3 +56,4 @@ index 3603afa227c80300e10ed76fe692b0ee68bf285a..197656413df655849ff6abcf784b6b41
 +
 +- This frontend does **not** implement Twilio server logic; it only renders event state and sends answer actions.
 +- Ring audio may require user interaction before playback due to browser autoplay policies.
+
