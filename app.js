@@ -1,27 +1,3 @@
-let device;
-
-async function initVoice() {
-  try {
-    const resp = await fetch(`${BACKEND_BASE_URL}/api/token`);
-    const { token } = await resp.json();
-
-    // Initialize the Twilio Device
-    device = new Twilio.Voice.Device(token, {
-      codecPreferences: ['opus', 'pcmu'],
-      fakeLocalDTMF: true,
-      enableIceRestart: true,
-    });
-
-    await device.register();
-    console.log('Microphone and Voice Engine Ready');
-  } catch (err) {
-    console.error("Failed to initialize voice:", err);
-  }
-}
-
-// Call this immediately
-initVoice();
-
 // =========================
 // Backend configuration
 // =========================
@@ -29,6 +5,28 @@ const BACKEND_BASE_URL = 'https://phonebox-backend.vercel.app';
 const ANSWER_API_URL = `${BACKEND_BASE_URL}/api/answer`;
 const HANGUP_API_URL = `${BACKEND_BASE_URL}/api/hangup`;
 const PASS_API_URL = `${BACKEND_BASE_URL}/api/pass`;
+
+// --- VOICE ENGINE START ---
+let device;
+
+async function initVoice() {
+  try {
+    const resp = await fetch(`${BACKEND_BASE_URL}/api/token`);
+    const { token } = await resp.json();
+
+    device = new Twilio.Voice.Device(token, {
+      codecPreferences: ['opus', 'pcmu'],
+    });
+
+    await device.register();
+    console.log('Microphone Ready');
+  } catch (err) {
+    console.error("Voice init failed:", err);
+  }
+}
+
+initVoice(); // Initialize immediately
+// --- VOICE ENGINE END ---
 
 const ENDPOINTS = [
   { number: '+61851246362', displayNumber: '+61 8 5124 6362', businessName: "Wesley and Co’s Locks Ipswich", messageLabel: 'Wesley welcome message' },
@@ -289,5 +287,6 @@ function formatDuration(s) {
 function formatTime(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
+
 
 
