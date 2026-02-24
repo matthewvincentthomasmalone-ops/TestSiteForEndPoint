@@ -6,27 +6,30 @@ const ANSWER_API_URL = `${BACKEND_BASE_URL}/api/answer`;
 const HANGUP_API_URL = `${BACKEND_BASE_URL}/api/hangup`;
 const PASS_API_URL = `${BACKEND_BASE_URL}/api/pass`;
 
-// --- VOICE ENGINE START ---
+// --- VOICE ENGINE INITIALIZATION ---
 let device;
 
 async function initVoice() {
   try {
     const resp = await fetch(`${BACKEND_BASE_URL}/api/token`);
+    if (!resp.ok) throw new Error("Could not fetch token");
     const { token } = await resp.json();
 
+    // Initialize Twilio Voice Device
     device = new Twilio.Voice.Device(token, {
       codecPreferences: ['opus', 'pcmu'],
+      fakeLocalDTMF: true,
+      enableIceRestart: true,
     });
 
     await device.register();
-    console.log('Microphone Ready');
+    console.log('Voice Engine: Registered and Microphone Ready');
   } catch (err) {
-    console.error("Voice init failed:", err);
+    console.error("Voice init failed (Check api/token.js):", err);
   }
 }
 
-initVoice(); // Initialize immediately
-// --- VOICE ENGINE END ---
+initVoice(); // Start the engine immediately
 
 const ENDPOINTS = [
   { number: '+61851246362', displayNumber: '+61 8 5124 6362', businessName: "Wesley and Co’s Locks Ipswich", messageLabel: 'Wesley welcome message' },
@@ -133,21 +136,18 @@ async function onAnswerClick(endpoint) {
   renderTiles();
 
   try {
-    // 1. Bridge the call to your browser's microphone/speaker
-    const params = { 
-      To: endpoint.number, 
-      callSid: entry.callSid 
-    };
-    
+    // 1. Connect the browser microphone to the call
+    const params = { To: endpoint.number, callSid: entry.callSid };
     const call = await device.connect({ params });
 
-    // 2. Attach the locksmith's voice to your dashboard audio
+    // 2. When the bridge is accepted, handle the audio
     call.on('accept', () => {
       const remoteAudio = document.getElementById('remoteAudio');
-      remoteAudio.srcObject = call.getRemoteStream(); // Audio starts here
+      remoteAudio.srcObject = call.getRemoteStream(); 
       
       entry.status = 'answered';
       entry.answeredAt = Date.now();
+      entry.ringingSince = null;
       renderTiles();
       addLog('answered', endpoint.number, entry.callSid, 'Two-way audio active');
     });
@@ -155,7 +155,8 @@ async function onAnswerClick(endpoint) {
   } catch (error) {
     entry.status = 'error';
     entry.errorMessage = error.message;
-    addLog('error', endpoint.number, entry.callSid, "Mic Error: " + error.message);
+    addLog('error', endpoint.number, entry.callSid, "Mic/Audio Error: " + error.message);
+    renderTiles();
   }
 }
 
@@ -184,15 +185,22 @@ async function onPassClick(endpoint) {
 async function onHangupClick(endpoint) {
   const entry = stateByNumber.get(endpoint.number);
   if (entry.status !== 'answered' && entry.status !== 'answering' && entry.status !== 'ringing') return;
+  
+  // If a browser call is active, disconnect the device first
+  if (device) device.disconnectAll();
+
   entry.status = 'hanging_up';
   renderTiles();
+
   try {
     const response = await fetch(HANGUP_API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ endpointNumber: endpoint.number, callSid: entry.callSid })
     });
+
     if (!response.ok) throw new Error('Terminate failed');
+
     entry.status = 'completed';
     if (entry.answeredAt) {
       entry.callDurationSec = Math.floor((Date.now() - entry.answeredAt) / 1000);
@@ -205,7 +213,6 @@ async function onHangupClick(endpoint) {
   }
 }
 
-
 function renderTiles() {
   endpointGrid.innerHTML = '';
   ENDPOINTS.forEach((endpoint) => {
@@ -216,27 +223,26 @@ function renderTiles() {
     const statusText = readableStatus(entry.status);
     const ringSeconds = entry.ringingSince ? Math.floor((Date.now() - entry.ringingSince) / 1000) : 0;
     
-    // ONLY ONE actions-row block allowed below
+    // Fixed syntax for the actions-row
     tile.innerHTML = `
       <div class="tile-head"><div class="business">${endpoint.businessName}</div></div>
       <div class="number">${endpoint.displayNumber}</div>
       <div class="status-row status-${entry.status}">
-        <span class="status-chip"><span class="signal-icon"></span>${statusText}</span>
-        <span>${entry.status === 'ringing' ? `Ringing ${ringSeconds}s` : ''}</span>
+        <span class="status-chip"><span class="signal-icon"></span>\${statusText}</span>
+        <span>\${entry.status === 'ringing' ? \`Ringing \${ringSeconds}s\` : ''}</span>
       </div>
       <div class="actions-row">
-        <button class="action-btn answer-btn" ${entry.status === 'ringing' ? '' : 'disabled'}>Answer</button>
-        <button class="action-btn pass-btn" ${entry.status === 'ringing' ? '' : 'disabled'}>Pass</button>
-        <button class="action-btn hangup-btn" ${(entry.status === 'answered' || entry.status === 'answering' || entry.status === 'ringing') ? '' : 'disabled'}>Terminate</button>
+        <button class="action-btn answer-btn" \${entry.status === 'ringing' ? '' : 'disabled'}>Answer</button>
+        <button class="action-btn pass-btn" \${entry.status === 'ringing' ? '' : 'disabled'}>Pass</button>
+        <button class="action-btn hangup-btn" \${(entry.status === 'answered' || entry.status === 'answering' || entry.status === 'ringing') ? '' : 'disabled'}>Terminate</button>
       </div>
-      <div class="action-hint">${actionHint(entry.status, endpoint.messageLabel)}</div>
+      <div class="action-hint">\${actionHint(entry.status, endpoint.messageLabel)}</div>
       <div class="meta">
-        <span>Last ring: ${entry.lastRingTime ? formatTime(entry.lastRingTime) : '-'}</span>
-        <span>Duration: ${formatDuration(entry.callDurationSec)}</span>
-        <span>Calls today: ${entry.callsToday}</span>
+        <span>Last ring: \${entry.lastRingTime ? formatTime(entry.lastRingTime) : '-'}</span>
+        <span>Duration: \${formatDuration(entry.callDurationSec)}</span>
+        <span>Calls today: \${entry.callsToday}</span>
       </div>
     `;
-    
     tile.querySelector('.answer-btn')?.addEventListener('click', () => onAnswerClick(endpoint));
     tile.querySelector('.pass-btn')?.addEventListener('click', () => onPassClick(endpoint));
     tile.querySelector('.hangup-btn')?.addEventListener('click', () => onHangupClick(endpoint));
@@ -244,11 +250,10 @@ function renderTiles() {
   });
 }
 
-
 function actionHint(status, messageLabel) {
   if (status === 'ringing') return 'Incoming call - flash indicator active';
   if (status === 'answering') return 'Answer request in progress...';
-  if (status === 'answered') return `Connected: ${messageLabel}`;
+  if (status === 'answered') return `Connected: \${messageLabel}`;
   if (status === 'hanging_up') return 'Termination in progress...';
   if (status === 'completed') return 'Call completed';
   if (status === 'passing') return 'Requesting next agent in hunt group...';
@@ -258,7 +263,7 @@ function actionHint(status, messageLabel) {
 function addLog(type, endpointNumber, callSid, message) {
   const li = document.createElement('li');
   const time = new Date().toLocaleTimeString();
-  li.textContent = `[${time}] [${type.toUpperCase()}] ${endpointNumber} — ${message}`;
+  li.textContent = \`[\${time}] [\${type.toUpperCase()}] \${endpointNumber} — \${message}\`;
   eventLog.prepend(li);
   if (eventLog.children.length > MAX_LOG_ITEMS) eventLog.removeChild(eventLog.lastChild);
 }
@@ -292,13 +297,9 @@ function resetAll() {
 function formatDuration(s) {
   const mins = Math.floor(s / 60).toString().padStart(2, '0');
   const sec = (s % 60).toString().padStart(2, '0');
-  return `${mins}:${sec}`;
+  return \`\${mins}:\${sec}\`;
 }
 
 function formatTime(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
-
-
-
-
