@@ -172,6 +172,7 @@ async function onHangupClick(endpoint) {
   }
 }
 
+
 function renderTiles() {
   endpointGrid.innerHTML = '';
   ENDPOINTS.forEach((endpoint) => {
@@ -181,6 +182,8 @@ function renderTiles() {
     if (entry.status === 'ringing') tile.classList.add('ringing');
     const statusText = readableStatus(entry.status);
     const ringSeconds = entry.ringingSince ? Math.floor((Date.now() - entry.ringingSince) / 1000) : 0;
+    
+    // ONLY ONE actions-row block allowed below
     tile.innerHTML = `
       <div class="tile-head"><div class="business">${endpoint.businessName}</div></div>
       <div class="number">${endpoint.displayNumber}</div>
@@ -200,12 +203,14 @@ function renderTiles() {
         <span>Calls today: ${entry.callsToday}</span>
       </div>
     `;
+    
     tile.querySelector('.answer-btn')?.addEventListener('click', () => onAnswerClick(endpoint));
     tile.querySelector('.pass-btn')?.addEventListener('click', () => onPassClick(endpoint));
     tile.querySelector('.hangup-btn')?.addEventListener('click', () => onHangupClick(endpoint));
     endpointGrid.appendChild(tile);
   });
 }
+
 
 function actionHint(status, messageLabel) {
   if (status === 'ringing') return 'Incoming call - flash indicator active';
@@ -260,3 +265,4 @@ function formatDuration(s) {
 function formatTime(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
+
