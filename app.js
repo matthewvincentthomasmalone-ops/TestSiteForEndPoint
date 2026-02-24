@@ -136,11 +136,9 @@ async function onAnswerClick(endpoint) {
   renderTiles();
 
   try {
-    // 1. Connect the browser microphone to the call
     const params = { To: endpoint.number, callSid: entry.callSid };
     const call = await device.connect({ params });
 
-    // 2. When the bridge is accepted, handle the audio
     call.on('accept', () => {
       const remoteAudio = document.getElementById('remoteAudio');
       remoteAudio.srcObject = call.getRemoteStream(); 
@@ -186,7 +184,6 @@ async function onHangupClick(endpoint) {
   const entry = stateByNumber.get(endpoint.number);
   if (entry.status !== 'answered' && entry.status !== 'answering' && entry.status !== 'ringing') return;
   
-  // If a browser call is active, disconnect the device first
   if (device) device.disconnectAll();
 
   entry.status = 'hanging_up';
@@ -223,7 +220,6 @@ function renderTiles() {
     const statusText = readableStatus(entry.status);
     const ringSeconds = entry.ringingSince ? Math.floor((Date.now() - entry.ringingSince) / 1000) : 0;
     
-    // REMOVED ALL BACKSLASHES BELOW
     tile.innerHTML = `
       <div class="tile-head"><div class="business">${endpoint.businessName}</div></div>
       <div class="number">${endpoint.displayNumber}</div>
@@ -253,7 +249,7 @@ function renderTiles() {
 function actionHint(status, messageLabel) {
   if (status === 'ringing') return 'Incoming call - flash indicator active';
   if (status === 'answering') return 'Answer request in progress...';
-  if (status === 'answered') return `Connected: \${messageLabel}`;
+  if (status === 'answered') return `Connected: ${messageLabel}`;
   if (status === 'hanging_up') return 'Termination in progress...';
   if (status === 'completed') return 'Call completed';
   if (status === 'passing') return 'Requesting next agent in hunt group...';
@@ -263,7 +259,7 @@ function actionHint(status, messageLabel) {
 function addLog(type, endpointNumber, callSid, message) {
   const li = document.createElement('li');
   const time = new Date().toLocaleTimeString();
-  li.textContent = `[${time}] [${type.toUpperCase()}] ${endpointNumber} — ${message}`; // Cleaned backslashes
+  li.textContent = `[${time}] [${type.toUpperCase()}] ${endpointNumber} — ${message}`;
   eventLog.prepend(li);
   if (eventLog.children.length > MAX_LOG_ITEMS) eventLog.removeChild(eventLog.lastChild);
 }
@@ -297,11 +293,9 @@ function resetAll() {
 function formatDuration(s) {
   const mins = Math.floor(s / 60).toString().padStart(2, '0');
   const sec = (s % 60).toString().padStart(2, '0');
-  return \`\${mins}:\${sec}\`;
+  return `${mins}:${sec}`;
 }
 
 function formatTime(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
-
-
