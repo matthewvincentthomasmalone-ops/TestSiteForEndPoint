@@ -128,23 +128,34 @@ function applyBackendEvent(evt) {
 async function onAnswerClick(endpoint) {
   const entry = stateByNumber.get(endpoint.number);
   if (entry.status !== 'ringing') return;
+
   entry.status = 'answering';
   renderTiles();
+
   try {
-    const response = await fetch(ANSWER_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ endpointNumber: endpoint.number, callSid: entry.callSid })
+    // 1. Bridge the call to your browser's microphone/speaker
+    const params = { 
+      To: endpoint.number, 
+      callSid: entry.callSid 
+    };
+    
+    const call = await device.connect({ params });
+
+    // 2. Attach the locksmith's voice to your dashboard audio
+    call.on('accept', () => {
+      const remoteAudio = document.getElementById('remoteAudio');
+      remoteAudio.srcObject = call.getRemoteStream(); // Audio starts here
+      
+      entry.status = 'answered';
+      entry.answeredAt = Date.now();
+      renderTiles();
+      addLog('answered', endpoint.number, entry.callSid, 'Two-way audio active');
     });
-    if (!response.ok) throw new Error(`Answer failed: ${response.status}`);
-    entry.status = 'answered';
-    entry.answeredAt = Date.now();
-    entry.ringingSince = null;
-    addLog('answered', endpoint.number, entry.callSid, 'Call connected successfully');
+
   } catch (error) {
     entry.status = 'error';
     entry.errorMessage = error.message;
-    addLog('error', endpoint.number, entry.callSid, error.message);
+    addLog('error', endpoint.number, entry.callSid, "Mic Error: " + error.message);
   }
 }
 
@@ -287,6 +298,7 @@ function formatDuration(s) {
 function formatTime(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
+
 
 
 
