@@ -1,3 +1,27 @@
+let device;
+
+async function initVoice() {
+  try {
+    const resp = await fetch(`${BACKEND_BASE_URL}/api/token`);
+    const { token } = await resp.json();
+
+    // Initialize the Twilio Device
+    device = new Twilio.Voice.Device(token, {
+      codecPreferences: ['opus', 'pcmu'],
+      fakeLocalDTMF: true,
+      enableIceRestart: true,
+    });
+
+    await device.register();
+    console.log('Microphone and Voice Engine Ready');
+  } catch (err) {
+    console.error("Failed to initialize voice:", err);
+  }
+}
+
+// Call this immediately
+initVoice();
+
 // =========================
 // Backend configuration
 // =========================
@@ -265,4 +289,5 @@ function formatDuration(s) {
 function formatTime(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
+
 
